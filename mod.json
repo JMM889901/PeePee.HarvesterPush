@@ -1,0 +1,20 @@
+{
+	"Name" : "Harvester push",
+	"Description": "Harvester push",
+	"Version": "1.0.0",
+	"LoadPriority": 2,
+	"RequiredOnClient": false,
+	"Scripts": [
+        {
+			"Path": "gamemodes/PP_Gamemode_HarvesterPush.gnut",
+			"RunOn": "CLIENT || SERVER",
+			"ClientCallback": {
+				"After": "PP_HarvesterPush_init"
+			},
+
+			"ServerCallback": {
+				"After": "PP_HarvesterPush_init"
+			}
+		}
+	]
+}
