@@ -22,7 +22,6 @@ struct
 
 void function GamemodeHarvesterPush_Init()
 {
-	SetSpawnpointGamemodeOverride( ATTRITION ) // use bounty hunt spawns as vanilla game has no spawns explicitly defined for aitdm
 
 	AddCallback_GameStateEnter( eGameState.Prematch, OnPrematchStart )
 	AddCallback_GameStateEnter( eGameState.Playing, OnPlaying )
@@ -412,9 +411,9 @@ void function OnSpectreLeeched( entity spectre, entity player )
 	// Set Owner so we can filter in HandleScore
 	spectre.SetOwner( player )
 	// Add score + update network int to trigger the "Score +n" popup
-	AddTeamScore( player.GetTeam(), 1 )
-	player.AddToPlayerGameStat( PGS_ASSAULT_SCORE, 1 )
-	player.SetPlayerNetInt("AT_bonusPoints", player.GetPlayerGameStat( PGS_ASSAULT_SCORE ) )
+	//AddTeamScore( player.GetTeam(), 1 )
+	//player.AddToPlayerGameStat( PGS_ASSAULT_SCORE, 1 )
+	//player.SetPlayerNetInt("AT_bonusPoints", player.GetPlayerGameStat( PGS_ASSAULT_SCORE ) )
 }
 
 // Same as SquadHandler, just for reapers

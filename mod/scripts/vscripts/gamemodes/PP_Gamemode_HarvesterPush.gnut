@@ -8,6 +8,7 @@ void function PP_HarvesterPush_init()
 {
     AddPrivateMatchModeSettingEnum("#MODE_SETTING_CATEGORY_HARVESTERPUSH", "HarvesterPush", ["#SETTING_DISABLED", "#SETTING_ENABLED"], "0")
     AddPrivateMatchModeSettingArbitrary("#MODE_SETTING_CATEGORY_HARVESTERPUSH", "Harvester_health", "5000")
+    AddPrivateMatchModeSettingEnum("#MODE_SETTING_CATEGORY_HARVESTERPUSH", "Turrets", ["#SETTING_DISABLED", "#SETTING_ENABLED"], "0")
 }
 #if SERVER
 int initialplayercount
@@ -19,6 +20,17 @@ void function PP_GameMode_HarvesterPush_init()
     AddCallback_GameStateEnter( eGameState.Playing, OnStart )
     ClassicMP_ForceDisableEpilogue( true )
     RegisterSignal( "OnHarvesterDamaged" )
+    SetSpawnpointGamemodeOverride( ATTRITION ) // use bounty hunt spawns as vanilla game has no spawns explicitly defined for aitdm
+    AddCallback_OnPlayerRespawned(Respawn)
+}
+void function Respawn(entity player)
+{
+    vector dif = <RandomFloatRange(50, 500), RandomFloatRange(50, 500), 500>
+    if(RandomInt(2) == 2)
+        dif.x = dif.x*-1 
+    if(RandomInt(2) == 2)
+        dif.y = dif.y*-1 
+    player.SetOrigin(OriginToGround( HarvesterSpawn(player.GetTeam()) + dif ))
 }
 int function HarvesterHealth()
 {
@@ -37,9 +49,11 @@ int function CheckScoreForDraw()
 }
 void function OnStart()
 {
+    initialplayercount = GetPlayerArray().len()
     CreateHarvester(TEAM_IMC)
     CreateHarvester(TEAM_MILITIA)
-    initialplayercount = GetPlayerArray().len()
+    //if(GetCurrentPlaylistVarInt("Turrets", 0) == 1)
+    //    CreateTurrets()
     GameRules_SetTeamScore(TEAM_IMC, HarvesterHealth() )
     GameRules_SetTeamScore(TEAM_MILITIA, HarvesterHealth())
 }
@@ -131,6 +145,93 @@ vector function HarvesterSpawn(int faction)
     }
     unreachable
 }
+//vector ornull function TurretSpawn(int faction)
+//{
+//    switch(GetMapName())
+//    {
+//        case "mp_grave":
+//            if(faction == TEAM_MILITIA)
+//                return 
+//            if(faction == TEAM_IMC)
+//                return 
+//        case "mp_forwardbase_kodai":
+//            if(faction == TEAM_MILITIA)
+//                return < -2265.24, -2337.53, 802.571>
+//            if(faction == TEAM_IMC)
+//                return <2336.53, 4331.89, 971.188>
+//        case "mp_homestead":
+//            if(faction == TEAM_MILITIA)
+//                return 
+//            if(faction == TEAM_IMC)
+//                return 
+//        case "mp_thaw":
+//            if(faction == TEAM_MILITIA)
+//                return 
+//            if(faction == TEAM_IMC)
+//                return 
+//        case "mp_black_water_canal":
+//            if(faction == TEAM_MILITIA)
+//                return 
+//            if(faction == TEAM_IMC)
+//                return 
+//        case "mp_eden":
+//            if(faction == TEAM_MILITIA)
+//                return 
+//            if(faction == TEAM_IMC)
+//                return 
+//        case "mp_drydock":
+//            if(faction == TEAM_IMC)
+//                return  
+//            if(faction == TEAM_MILITIA)
+//                return 
+//
+//        case "mp_crashsite3":
+//            if(faction == TEAM_MILITIA)
+//                return 
+//            if(faction == TEAM_IMC)
+//                return 
+//        case "mp_complex3":
+//            if(faction == TEAM_IMC)
+//                return 
+//            if(faction == TEAM_MILITIA)
+//                return 
+//        case "mp_angel_city":
+//            if(faction == TEAM_IMC)
+//                return 
+//            if(faction == TEAM_MILITIA)
+//                return 
+//        case "mp_thaw":
+//            if(faction == TEAM_IMC)
+//                return 
+//            if(faction == TEAM_MILITIA)
+//                return 
+//        case "mp_colony02":
+//            if(faction == TEAM_MILITIA)
+//                return 
+//            if(faction == TEAM_IMC)
+//                return 
+//        case "mp_glitch":
+//            if(faction == TEAM_IMC)
+//                return 
+//            if(faction == TEAM_MILITIA)
+//                return 
+//        case "mp_rise":
+//            if(faction == TEAM_IMC)
+//                return  
+//            if(faction == TEAM_MILITIA)
+//                return 
+//        case "mp_wargames":
+//            if(faction == TEAM_IMC)
+//                return 
+//            if(faction == TEAM_MILITIA)
+//                return 
+//        case "mp_relic02":
+//            if(faction == TEAM_IMC)
+//                return  
+//            if(faction == TEAM_MILITIA)
+//                return 
+//    }
+//}
 entity function Harvesterpush_GetHarvesterOfTeam(int faction)
 {
     if(faction == TEAM_IMC)
@@ -157,11 +258,12 @@ void function CreateHarvester(int faction)
     Highlight_SetFriendlyHighlight( Harvester, "hunted_friendly" )
     AddEntityCallback_OnDamaged(Harvester, OnShieldDamaged)
     Harvester.EnableAttackableByAI( 10, 0, AI_AP_FLAG_NONE )
+    AI_CreateDangerousArea_Static( Harvester, Harvester, 250, TEAM_INVALID, true, true, HarvesterSpawn(faction) )
 }
 void function OnShieldDamaged(entity shield, var damageInfo)
 {
     entity attacker = DamageInfo_GetAttacker( damageInfo )
-    if(DamageInfo_GetDamageSourceIdentifier( damageInfo ) == eDamageSourceId.mp_titancore_laser_cannon)
+    if(DamageInfo_GetDamageSourceIdentifier( damageInfo ) == eDamageSourceId.mp_titancore_laser_cannon || DamageInfo_GetDamageSourceIdentifier( damageInfo ) == eDamageSourceId.mp_titanability_slow_trap)
         DamageInfo_SetDamage( damageInfo, DamageInfo_GetDamage( damageInfo )/10 )
         
     float damageAmount = DamageInfo_GetDamage( damageInfo ) 
@@ -188,34 +290,39 @@ void function StartShieldRegen(entity shield)
             }
             wait 1
         }
+        entity MiniShield = CreateShieldWithSettings(shield.GetOrigin(), <0,0,0>,200,500,360,999999,1500, FX_HARVESTER_OVERSHIELD )
+        SetTeam( MiniShield, shield.GetTeam())
     }
-    else
-    {
-        for(int x = 0; x<5; x++)
-        {
-            foreach(entity player in GetPlayerArrayOfTeam(shield.GetTeam()))
-            {
-                SendHudMessage( player, "Harvester damaged! Proximity repair possible in " + (4-x) + " Seconds", -1, 0.2, 255, 200, 200, 255, 0, 1, 0 )
-            }
-            wait 1
-        }
-    }
+    //else
+    //{
+    //    for(int x = 0; x<5; x++)
+    //    {
+    //        foreach(entity player in GetPlayerArrayOfTeam(shield.GetTeam()))
+    //        {
+    //            SendHudMessage( player, "Harvester damaged! Proximity repair possible in " + (4-x) + " Seconds", -1, 0.2, 255, 200, 200, 255, 0, 1, 0 )
+    //        }
+    //        wait 1
+    //    }
+    //}
     foreach(entity player in GetPlayerArrayOfTeam(shield.GetTeam()))
     {
-        SendHudMessage( player, "Harvester damaged! Proximity repair is now possible!", -1, 0.2, 255, 200, 200, 255, 0.15, 10, 10 )
+        if(GameRules_GetTeamScore( shield.GetTeam()) > HarvesterHealth()/5)
+            SendHudMessage( player, "Harvester damaged! Proximity repair is now possible!", -1, 0.2, 255, 200, 200, 255, 0.15, 10, 10 )
+        else
+            SendHudMessage( player, "Harvester heavily damaged! Emergency repair is now possible!", -1, 0.2, 255, 200, 200, 255, 0.15, 10, 10 )
+
     }
 
-    entity MiniShield = CreateShieldWithSettings(shield.GetOrigin(), <0,0,0>,200,500,360,999999,1500, FX_HARVESTER_OVERSHIELD )
-    SetTeam( MiniShield, shield.GetTeam())
     while(true)
     {
         foreach (entity player in GetPlayerArrayOfTeam(shield.GetTeam()))
         {
                 if(DistanceSqr( player.GetOrigin(), shield.GetOrigin() ) < 600 * 600)
                 {
-                    if(GameRules_GetTeamScore( shield.GetTeam()) < HarvesterHealth() && GameRules_GetTeamScore( shield.GetTeam()) > 0)
+                    if(GameRules_GetTeamScore( shield.GetTeam()) < HarvesterHealth() && GameRules_GetTeamScore( shield.GetTeam()) > 0 && IsAlive(player))
                     {
-                        if(player.IsTitan()){
+                        if(player.IsTitan())
+                        {
                             shield.kv.health = GameRules_GetTeamScore( shield.GetTeam()) + min(500, HarvesterHealth()-GameRules_GetTeamScore( shield.GetTeam()))
                             GameRules_SetTeamScore( shield.GetTeam(),GameRules_GetTeamScore(shield.GetTeam()) + min(500, HarvesterHealth()-GameRules_GetTeamScore( shield.GetTeam()) ))
                         }
